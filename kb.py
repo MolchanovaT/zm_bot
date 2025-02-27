@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 
 menu = [
-    [InlineKeyboardButton(text="Дилер", callback_data="dealer"),
+    [InlineKeyboardButton(text="Дилер", callback_data="diler"),
      InlineKeyboardButton(text="ЛПУ", callback_data="lpu")],
     [InlineKeyboardButton(text="🔎 Помощь", callback_data="help")]
 ]
