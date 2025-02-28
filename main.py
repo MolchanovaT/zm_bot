@@ -1,13 +1,22 @@
-import misc
 import asyncio
 import logging
 
+from db import init_db  # Импортируем инициализацию БД
+from misc import bot
+from handlers import dp
+
 
 async def main():
-    await misc.bot.delete_webhook(drop_pending_updates=True)
-    await misc.dp.start_polling(misc.bot, allowed_updates=misc.dp.resolve_used_update_types())
+    logging.basicConfig(level=logging.INFO)
+
+    # Проверяем и создаем БД, если её нет
+    await init_db()
+
+    # Очищаем возможные старые обновления и запускаем бота
+    await bot.delete_webhook(drop_pending_updates=True)
+
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
