@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админка</title>
+</head>
+<body>
+<h2>📋 Админ-панель</h2>
+
+<!-- Уведомления -->
+{% with messages = get_flashed_messages(with_categories=True) %}
+{% if messages %}
+{% for category, message in messages %}
+<p style="color: {% if category == 'success' %}green{% else %}red{% endif %};">
+    {{ message }}
+</p>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<h3>📂 Дилеры</h3>
+<table border="1">
+    <tr>
+        <th>Название</th>
+        <th>ИНН</th>
+        <th>Статус</th>
+        <th>Действия</th>
+    </tr>
+    {% for item in dilers %}
+    <tr>
+        <td>{{ item.name }}</td>
+        <td>{{ item.inn }}</td>
+        <td>{% if item.allowed %}✅ Одобрено{% else %}❌ Запрещено{% endif %}</td>
+        <td>
+            <a href="{{ url_for('edit_record', table='Dilers', item_id=item.id) }}">✏️ Редактировать</a>
+            <a href="{{ url_for('delete_record', table='Dilers', item_id=item.id) }}">🗑 Удалить</a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<h3>📂 ЛПУ</h3>
+<table border="1">
+    <tr>
+        <th>Название</th>
+        <th>ИНН</th>
+        <th>Статус</th>
+        <th>Действия</th>
+    </tr>
+    {% for item in lpus %}
+    <tr>
+        <td>{{ item.name }}</td>
+        <td>{{ item.inn }}</td>
+        <td>{% if item.allowed %}✅ Одобрено{% else %}❌ Запрещено{% endif %}</td>
+        <td>
+            <a href="{{ url_for('edit_record', table='LPU', item_id=item.id) }}">✏️ Редактировать</a>
+            <a href="{{ url_for('delete_record', table='LPU', item_id=item.id) }}">🗑 Удалить</a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<a href="{{ url_for('add_record') }}">➕ Добавить новую запись</a>
+
+<h3>📤 Загрузить CSV</h3>
+<form method="post" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
+    <input type="file" name="file" required>
+    <select name="table">
+        <option value="Dilers">Дилеры</option>
+        <option value="LPU">ЛПУ</option>
+    </select>
+    <button type="submit">Загрузить</button>
+</form>
+
+</body>
+</html>

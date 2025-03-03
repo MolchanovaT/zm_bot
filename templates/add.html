@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Добавить запись</title>
+</head>
+<body>
+    <h2>➕ Добавление записи</h2>
+    <form method="post">
+        <label>Название:</label>
+        <input type="text" name="name" required><br>
+
+        <label>ИНН:</label>
+        <input type="text" name="inn" required><br>
+
+        <label>Таблица:</label>
+        <select name="table">
+            <option value="Dilers">Дилеры</option>
+            <option value="LPU">ЛПУ</option>
+        </select><br>
+
+        <button type="submit">💾 Добавить</button>
+        <a href="{{ url_for('index') }}">⬅️ Отмена</a>
+    </form>
+</body>
+</html>

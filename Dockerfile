@@ -1,8 +1,8 @@
-# Используем базовый образ Python
+# Используем Python 3.11
 FROM python:3.11
 
 # Устанавливаем рабочую директорию
-WORKDIR /bot
+WORKDIR /app
 
 # Копируем файлы проекта
 COPY . .
@@ -10,5 +10,8 @@ COPY . .
 # Устанавливаем зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Запуск скрипта инициализации БД
-CMD ["sh", "-c", "python -c 'import asyncio; from db import init_db; asyncio.run(init_db())' && python main.py"]
+# Открываем порты для Flask
+EXPOSE 5000
+
+# Указываем запуск через docker-compose
+CMD ["sh", "-c", "python admin.py & python main.py"]
