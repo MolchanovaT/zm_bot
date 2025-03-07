@@ -7,3 +7,5 @@ services:
     ports:
       - "5000:5000"  # Прокидываем порт Flask-админки
     restart: always  # Автоматический перезапуск при сбое
+    volumes:
+      - ./data:/app/data

@@ -1,8 +1,13 @@
 import os
 import pandas as pd
+import asyncio
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
+
+import config
+from data.load_csv import load_data_from_csv  # Загружаем функцию импорта CSV
 
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {"csv"}
@@ -15,13 +20,12 @@ DATABASE_PATH = os.path.join(BASE_DIR, "data", "database.sqlite")  # Абсол�
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DATABASE_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["SECRET_KEY"] = "supersecretkey"
+app.config["SECRET_KEY"] = config.SECRET_KEY  # Берем секретный ключ из config
 
 db = SQLAlchemy(app)
 
 # Проверяем и создаём папку uploads при запуске
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 # Проверка формата файла
@@ -44,24 +48,60 @@ class LPU(db.Model):
     allowed = db.Column(db.Boolean, default=True)
 
 
+login_manager = LoginManager(app)
+login_manager.login_view = "login"  # Если не авторизован — отправляет на страницу логина
+
+
+# 👤 Модель пользователя (только админ)
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User(user_id)
+
+
+# 🔹 Страница логина
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        if username == "admin" and password == config.PASSWORD:
+            login_user(User(1))
+            flash("✅ Вход выполнен!", "success")
+            return redirect(url_for("index"))
+        else:
+            flash("❌ Неверный логин или пароль!", "danger")
+    return render_template("login.html")
+
+
+# 🔹 Выход из аккаунта
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash("🚪 Вы вышли из системы!", "info")
+    return redirect(url_for("login"))
+
+
 # Главная страница админки
 @app.route('/')
+@login_required
 def index():
     dilers = Dilers.query.all()
     lpus = LPU.query.all()
-    return render_template('index.html', dilers=dilers, lpus=lpus)
+    return render_template('index.html', dilers=dilers, lpus=lpus, user=current_user)
 
 
 # Обновление статуса "Разрешено/Запрещено"
 @app.route('/toggle/<string:table>/<int:item_id>')
+@login_required
 def toggle_status(table, item_id):
-    if table == "Dilers":
-        record = Dilers.query.get(item_id)
-    elif table == "LPU":
-        record = LPU.query.get(item_id)
-    else:
-        return "Ошибка: неверная таблица", 400
-
+    Model = Dilers if table == "Dilers" else LPU
+    record = Model.query.get(item_id)
     if record:
         record.allowed = not record.allowed  # Инвертируем статус
         db.session.commit()
@@ -70,6 +110,7 @@ def toggle_status(table, item_id):
 
 # Добавление записи
 @app.route("/add", methods=["GET", "POST"])
+@login_required
 def add_record():
     """Добавление новой записи через веб-интерфейс"""
     if request.method == "POST":
@@ -91,14 +132,10 @@ def add_record():
 
 # Удаление записи
 @app.route('/delete/<string:table>/<int:item_id>')
+@login_required
 def delete_record(table, item_id):
-    if table == "Dilers":
-        record = Dilers.query.get(item_id)
-    elif table == "LPU":
-        record = LPU.query.get(item_id)
-    else:
-        return "Ошибка: неверная таблица", 400
-
+    Model = Dilers if table == "Dilers" else LPU
+    record = Model.query.get(item_id)
     if record:
         db.session.delete(record)
         db.session.commit()
@@ -106,6 +143,7 @@ def delete_record(table, item_id):
 
 
 @app.route("/edit/<string:table>/<int:item_id>", methods=["GET", "POST"])
+@login_required
 def edit_record(table, item_id):
     """Редактирование записи (название, ИНН, статус)"""
     Model = Dilers if table == "Dilers" else LPU
@@ -129,6 +167,7 @@ def edit_record(table, item_id):
 
 # Загрузка CSV
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload_file():
     """Обрабатывает загрузку файла CSV"""
     if "file" not in request.files:
@@ -146,43 +185,17 @@ def upload_file():
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
 
-        # ⬇️ Создаём папку uploads перед сохранением файла
         os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
         file.save(file_path)
 
-        # Загружаем данные из CSV в БД
-        load_csv_to_db(file_path, table)
-        flash(f"✅ Данные загружены в таблицу {table}!", "success")
+        try:
+            asyncio.run(load_data_from_csv(file_path, table))
+            flash(f"✅ Данные загружены в таблицу {table}!", "success")
+        except Exception as e:
+            flash(f"❌ Ошибка при загрузке файла: {str(e)}", "danger")
 
     return redirect(url_for("index"))
-
-
-# Очистка таблицы и загрузка новых данных
-def load_csv_to_db(file_path, table):
-    """Очищает таблицу и загружает данные из CSV"""
-    df = pd.read_csv(file_path, encoding="windows-1251", dtype={"inn": str}, sep=",", quoting=3)
-
-    df.dropna(subset=["inn"], inplace=True)  # Убираем пустые ИНН
-    df["inn"] = df["inn"].astype(str)  # Приводим ИНН к строковому типу
-
-    # **Удаляем дубликаты по ИНН, оставляя первую запись**
-    df = df.drop_duplicates(subset=["inn"], keep="first")
-
-    Model = Dilers if table == "Dilers" else LPU
-
-    # Очищаем таблицу перед загрузкой новых данных
-    db.session.query(Model).delete()
-    db.session.commit()
-
-    # Добавляем новые данные
-    for _, row in df.iterrows():
-        new_record = Model(name=row["name"], inn=row["inn"])
-        db.session.add(new_record)
-
-    db.session.commit()
-    os.remove(file_path)  # Удаляем загруженный файл после обработки
-
 
 
 # Запуск сервера
