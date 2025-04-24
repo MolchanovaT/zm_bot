@@ -1,9 +1,10 @@
-import os
-import pandas as pd
 import asyncio
+import os
+from datetime import datetime
+
 from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 
 import config
@@ -32,6 +33,7 @@ def allowed_file(filename):
 
 
 class Dilers(db.Model):
+    __tablename__ = "Dilers"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     inn = db.Column(db.String(50), unique=True, nullable=False)
@@ -39,10 +41,21 @@ class Dilers(db.Model):
 
 
 class LPU(db.Model):
+    __tablename__ = "LPU"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     inn = db.Column(db.String(50), unique=True, nullable=False)
     allowed = db.Column(db.Boolean, default=True)
+
+
+class PendingReview(db.Model):
+    __tablename__ = "PendingReview"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    inn = db.Column(db.String(50), unique=True, nullable=False)
+    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    approved = db.Column(db.Boolean, default=False)
+    denied = db.Column(db.Boolean, default=False)
 
 
 login_manager = LoginManager(app)
@@ -86,7 +99,8 @@ def logout():
 def index():
     dilers = Dilers.query.all()
     lpus = LPU.query.all()
-    return render_template('index.html', dilers=dilers, lpus=lpus, user=current_user)
+    pending = PendingReview.query.all()
+    return render_template('index.html', dilers=dilers, lpus=lpus, pending=pending, user=current_user)
 
 
 @app.route('/toggle/<string:table>/<int:item_id>')
@@ -107,12 +121,29 @@ def add_record():
         name = request.form["name"]
         inn = request.form["inn"]
         table = request.form["table"]
-        Model = Dilers if table == "Dilers" else LPU
-        new_record = Model(name=name, inn=inn)
+
+        if table == "Dilers":
+            new_record = Dilers(name=name, inn=inn)
+        elif table == "LPU":
+            new_record = LPU(name=name, inn=inn)
+        elif table == "PendingReview":
+            from datetime import datetime
+
+            date_str = request.form.get("date")
+            date = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else datetime.today().date()
+            approved = "approved" in request.form
+            denied = "denied" in request.form
+
+            new_record = PendingReview(name=name, inn=inn, date=date, approved=approved, denied=denied)
+        else:
+            flash("❌ Неизвестная таблица!", "danger")
+            return redirect(url_for("index"))
+
         db.session.add(new_record)
         db.session.commit()
         flash(f"✅ Запись добавлена в {table}!", "success")
         return redirect(url_for("index"))
+
     return render_template("add.html")
 
 
@@ -130,7 +161,16 @@ def delete_record(table, item_id):
 @app.route("/edit/<string:table>/<int:item_id>", methods=["GET", "POST"])
 @login_required
 def edit_record(table, item_id):
-    Model = Dilers if table == "Dilers" else LPU
+    Model = {
+        "Dilers": Dilers,
+        "LPU": LPU,
+        "PendingReview": PendingReview
+    }.get(table)
+
+    if not Model:
+        flash("❌ Неверная таблица!", "danger")
+        return redirect(url_for("index"))
+
     record = Model.query.get(item_id)
     if not record:
         flash("❌ Запись не найдена!", "danger")
@@ -139,7 +179,24 @@ def edit_record(table, item_id):
     if request.method == "POST":
         record.name = request.form["name"]
         record.inn = request.form["inn"]
-        record.allowed = "allowed" in request.form
+
+        if table == "PendingReview":
+            record.approved = "approved" in request.form
+            record.denied = "denied" in request.form
+            date_input = request.form.get("date")
+
+            # Если запрет стоит, а дата не указана — ставим сегодняшнюю
+            if record.denied and not date_input:
+                record.date = datetime.today().date()
+            else:
+                try:
+                    record.date = datetime.strptime(date_input, "%Y-%m-%d").date() if date_input else None
+                except Exception:
+                    record.date = None
+
+        else:
+            record.allowed = "allowed" in request.form
+
         db.session.commit()
         flash("✅ Запись обновлена!", "success")
         return redirect(url_for("index"))
@@ -156,6 +213,16 @@ def upload_file():
 
     file = request.files["file"]
     table = request.form["table"]
+
+    if table == "PendingReview":
+        model = PendingReview
+    elif table == "Dilers":
+        model = Dilers
+    elif table == "LPU":
+        model = LPU
+    else:
+        flash("❌ Неверная таблица!", "danger")
+        return redirect(url_for("index"))
 
     if file.filename == "":
         flash("❌ Файл не выбран!", "danger")

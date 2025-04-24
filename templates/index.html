@@ -11,11 +11,11 @@
 <!-- Уведомления -->
 {% with messages = get_flashed_messages(with_categories=True) %}
 {% if messages %}
-{% for category, message in messages %}
-<p style="color: {% if category == 'success' %}green{% else %}red{% endif %};">
-    {{ message }}
-</p>
-{% endfor %}
+    {% for category, message in messages %}
+        <p style="color: {% if category == 'success' %}green{% else %}red{% endif %};">
+            {{ message }}
+        </p>
+    {% endfor %}
 {% endif %}
 {% endwith %}
 
@@ -61,6 +61,31 @@
     {% endfor %}
 </table>
 
+<h3>⏳ На рассмотрении</h3>
+<table border="1">
+    <tr>
+        <th>Контрагент</th>
+        <th>ИНН</th>
+        <th>Дата</th>
+        <th>Разрешено</th>
+        <th>Запрещено</th>
+        <th>Действия</th>
+    </tr>
+    {% for item in pending %}
+    <tr>
+        <td>{{ item.name }}</td>
+        <td>{{ item.inn }}</td>
+        <td>{{ item.date.strftime("%d.%m.%Y") }}</td>
+        <td>{% if item.approved %}✅{% else %}—{% endif %}</td>
+        <td>{% if item.denied %}❌{% else %}—{% endif %}</td>
+        <td>
+            <a href="{{ url_for('edit_record', table='PendingReview', item_id=item.id) }}">✏️ Редактировать</a>
+            <a href="{{ url_for('delete_record', table='PendingReview', item_id=item.id) }}">🗑 Удалить</a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
 <a href="{{ url_for('add_record') }}">➕ Добавить новую запись</a>
 
 <h3>📤 Загрузить CSV</h3>
@@ -69,6 +94,7 @@
     <select name="table">
         <option value="Dilers">Дилеры</option>
         <option value="LPU">ЛПУ</option>
+        <option value="PendingReview">На рассмотрении</option>
     </select>
     <button type="submit">Загрузить</button>
 </form>

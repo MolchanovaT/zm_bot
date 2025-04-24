@@ -5,22 +5,40 @@
     <title>Добавить запись</title>
 </head>
 <body>
-    <h2>➕ Добавление записи</h2>
-    <form method="post">
-        <label>Название:</label>
-        <input type="text" name="name" required><br>
+<h2>➕ Добавление записи</h2>
+<form method="post">
+    <label>Название:</label>
+    <input type="text" name="name" required><br>
 
-        <label>ИНН:</label>
-        <input type="text" name="inn" required><br>
+    <label>ИНН:</label>
+    <input type="text" name="inn" required><br>
 
-        <label>Таблица:</label>
-        <select name="table">
-            <option value="Dilers">Дилеры</option>
-            <option value="LPU">ЛПУ</option>
-        </select><br>
+    <label>Таблица:</label>
+    <select name="table" id="table-select" onchange="toggleExtraFields()">
+        <option value="Dilers">Дилеры</option>
+        <option value="LPU">ЛПУ</option>
+        <option value="PendingReview">На рассмотрении</option>
+    </select><br>
 
-        <button type="submit">💾 Добавить</button>
-        <a href="{{ url_for('index') }}">⬅️ Отмена</a>
-    </form>
+    <div id="extra-fields" style="display:none;">
+        <label>Дата:</label>
+        <input type="date" name="date"><br>
+
+        <label><input type="checkbox" name="approved"> Разрешено</label><br>
+        <label><input type="checkbox" name="denied"> Запрещено</label><br>
+    </div>
+
+    <button type="submit">💾 Добавить</button>
+    <a href="{{ url_for('index') }}">⬅️ Отмена</a>
+</form>
+
+<script>
+    function toggleExtraFields() {
+        const select = document.getElementById("table-select");
+        const extra = document.getElementById("extra-fields");
+        extra.style.display = (select.value === "PendingReview") ? "block" : "none";
+    }
+    toggleExtraFields(); // инициализация при загрузке
+</script>
 </body>
 </html>

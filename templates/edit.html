@@ -5,19 +5,26 @@
     <title>Редактирование</title>
 </head>
 <body>
-    <h2>✏️ Редактирование записи</h2>
-    <form method="post">
-        <label>Название:</label>
-        <input type="text" name="name" value="{{ record.name }}" required><br>
+<h2>✏️ Редактирование записи</h2>
+<form method="post">
+    <label>Название:</label>
+    <input type="text" name="name" value="{{ record.name }}" required><br>
 
-        <label>ИНН:</label>
-        <input type="text" name="inn" value="{{ record.inn }}" required><br>
+    <label>ИНН:</label>
+    <input type="text" name="inn" value="{{ record.inn }}" required><br>
 
-        <label>Статус:</label>
-        <input type="checkbox" name="allowed" {% if record.allowed %}checked{% endif %}> Одобрено<br>
+    {% if table == "PendingReview" %}
+        <label>Дата:</label>
+        <input type="date" name="date" value="{{ record.date }}"><br>
 
-        <button type="submit">💾 Сохранить</button>
-        <a href="{{ url_for('index') }}">⬅️ Отмена</a>
-    </form>
+        <label><input type="checkbox" name="approved" {% if record.approved %}checked{% endif %}> Разрешено</label><br>
+        <label><input type="checkbox" name="denied" {% if record.denied %}checked{% endif %}> Запрещено</label><br>
+    {% else %}
+        <label><input type="checkbox" name="allowed" {% if record.allowed %}checked{% endif %}> Одобрено</label><br>
+    {% endif %}
+
+    <button type="submit">💾 Сохранить</button>
+    <a href="{{ url_for('index') }}">⬅️ Отмена</a>
+</form>
 </body>
 </html>
